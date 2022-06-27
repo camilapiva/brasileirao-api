@@ -16,7 +16,7 @@ public class ScrapingUtil {
 	private static final String COMPLEMENTO_URL_GOOGLE = "&hl=pt=BR";
 	
 	public static void main(String[] args) {
-		String url = BASE_URL_GOOGLE + "gremio+x+athletico-PR+21/09/2016" + COMPLEMENTO_URL_GOOGLE;
+		String url = BASE_URL_GOOGLE + "philadelphia+union+x+new+york+city+26/06/2022" + COMPLEMENTO_URL_GOOGLE;
 		
 		ScrapingUtil scraping = new ScrapingUtil();
 		scraping.obtendoInformacoesPartida(url);
@@ -32,11 +32,63 @@ public class ScrapingUtil {
 			
 			String title = document.title();
 			LOGGER.info("Titulo da pagina: {}", title);
+	
+			StatusPartida statusPartida = obtendoStatusPartida(document);
+			LOGGER.info("Status partida: {}", statusPartida);
 			
+			String tempoPartida = obtendoTempoPartida(document); 
+			LOGGER.info("Tempo partida: {}", tempoPartida);
 		} catch (IOException e) {
 			LOGGER.error("ERRO AO TENTAR CONECTAR NO GOOGLE COM JSOUP -> {}", e.getMessage());
 		}
 		
 		return partida;
+	}
+	
+	public StatusPartida obtendoStatusPartida(Document document) {
+		//Situações: 1- Partida não iniciada, 2- Partida iniciada, 3- Partida encerrada, 4- Penalidades
+		StatusPartida statusPartida = StatusPartida.PARTIDA_NAO_INICIADA;
+		
+		boolean isTempoPartida = document.select("div[class=imso_mh__lv-m-stts-cont]").isEmpty();
+		if(!isTempoPartida) {
+			String tempoPartida = document.select("div[class=imso_mh__lv-m-stts-cont]").first().text();
+			statusPartida = StatusPartida.PARTIDA_EM_ANDAMENTO;
+			
+			if(tempoPartida.contains("Pênaltis")) {
+				statusPartida = StatusPartida.PARTIDA_PENALTIS;
+			}
+		}
+		
+		isTempoPartida = document.select("span[class=imso_mh__ft-mtch imso-medium-font imso_mh__ft-mtchc]").isEmpty();
+		if(!isTempoPartida) {
+			statusPartida = StatusPartida.PARTIDA_ENCERRADA;
+		}
+
+		return statusPartida;
+	}
+	
+	public String obtendoTempoPartida(Document document) {
+		String tempoPartida = null;
+		
+		//Jogo em andamento, intervalo ou penalidades
+		boolean isTempoPartida = document.select("div[class=imso_mh__lv-m-stts-cont]").isEmpty();
+		if(!isTempoPartida) {
+			tempoPartida = document.select("div[class=imso_mh__lv-m-stts-cont]").first().text();
+		}
+		
+		isTempoPartida = document.select("span[class=imso_mh__ft-mtch imso-medium-font imso_mh__ft-mtchc]").isEmpty();
+		if(!isTempoPartida) {
+			tempoPartida = document.select("span[class=imso_mh__ft-mtch imso-medium-font imso_mh__ft-mtchc]").first().text();
+		}
+	
+		return corrigeTempoPartida(tempoPartida);
+	}
+	
+	public String corrigeTempoPartida(String tempo) {
+		if(tempo.contains("'")) {
+			return tempo.replace(" ", "").replace("'", " min");
+		} else {
+			return tempo;
+		}
 	}
 }
